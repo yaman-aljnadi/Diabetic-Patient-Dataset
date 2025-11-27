@@ -791,7 +791,261 @@ results_all <- results_all[order(-results_all$Kappa), ]
 
 print(results_all)
 
-write.csv(results_all, file.path(CFG$out_dir, "model_kappa_results.csv"), row.names = FALSE)
+write.csv(results_all, file.path(CFG$out_dir, "model_kappa_results_original.csv"), row.names = FALSE)
+
+# Save confusion matrices (Not Working will try fixing it tomorrow)
+saveRDS(conf_list, file.path(CFG$out_dir, "model_confusion_matrices.rds"))
+
+cat("Training completed. Summary written to outputs/.")
+
+
+
+
+
+
+
+#  MODEL TRAINING FOR 12 CLASSIFIERS
+#  Uses caret::train(), Kappa, Confusion Matrix, and Test Set
+
+set.seed(123)
+
+#============================================================
+# Choose which processed dataset to model
+# Recommended: Box-Cox + Center/Scale + Correlation-Pruned
+#============================================================
+
+# ============================================================
+# FIX CLASS LABELS (IMPORTANT FOR multinom AND OTHER MODELS)
+# ============================================================
+
+# Extract original levels
+original_levels <- levels(train_base[[response]])
+cat("Original response levels:\n")
+print(original_levels)
+
+# Create safe R variable names
+safe_levels <- make.names(original_levels)
+
+cat("Renamed (safe) levels:\n")
+print(safe_levels)
+
+# Apply renaming to ALL processed training/test sets
+train_base[[response]]    <- factor(train_base[[response]],    levels = original_levels, labels = safe_levels)
+test_base[[response]]     <- factor(test_base[[response]],     levels = original_levels, labels = safe_levels)
+
+train_spatial[[response]] <- factor(train_spatial[[response]], levels = original_levels, labels = safe_levels)
+test_spatial[[response]]  <- factor(test_spatial[[response]],  levels = original_levels, labels = safe_levels)
+
+train_pca[[response]]     <- factor(train_pca[[response]],     levels = original_levels, labels = safe_levels)
+test_pca[[response]]      <- factor(test_pca[[response]],      levels = original_levels, labels = safe_levels)
+
+
+train_set <- train_base
+test_set  <- test_base
+
+response <- CFG$response
+
+x_train <- dplyr::select(train_set, -!!sym(response))
+x_test  <- dplyr::select(test_set,  -!!sym(response))
+
+y_train <- train_set[[response]]
+y_test  <- test_set[[response]]
+
+# Common Training Control (K-fold CV)
+library(doParallel)
+
+# 1. Register Parallel Backend. This is makes it run the NN model faster
+num_cores <- parallel::detectCores() - 1 
+cl <- makePSOCKcluster(num_cores)
+registerDoParallel(cl)
+
+# 2. Update Control for Monitoring
+ctrl <- trainControl(
+  method = "cv",
+  number = 10,                 
+  summaryFunction = multiClassSummary,
+  classProbs = TRUE,
+  allowParallel = TRUE,        
+  verboseIter = TRUE,
+  sampling = "up"
+)
+
+# Storage structure
+model_list <- list()
+results_list <- list()
+conf_list <- list()
+
+add_model <- function(name, model, prediction) {
+  model_list[[name]] <<- model
+  conf_list[[name]] <<- confusionMatrix(prediction, y_test)
+  results_list[[name]] <<- data.frame(
+    Model = name,
+    Kappa = conf_list[[name]]$overall["Kappa"],
+    Accuracy = conf_list[[name]]$overall["Accuracy"]
+  )
+}
+
+# LINEAR MODELS
+
+
+# 1. Logistic Regression ("multinom" for multi-class)
+set.seed(123)
+m_log <- train(
+  x_train, y_train,
+  method = "multinom",
+  trControl = ctrl
+)
+p_log <- predict(m_log, x_test)
+add_model("Logistic Regression", m_log, p_log)
+
+print(m_log)
+
+# 2. Linear Discriminant Analysis
+set.seed(123)
+m_lda <- train(
+  x_train, y_train,
+  method = "lda",
+  trControl = ctrl
+)
+p_lda <- predict(m_lda, x_test)
+add_model("LDA", m_lda, p_lda)
+
+
+# 3. PLS-DA  ("pls" chooses PLSDA when outcome is factor)
+set.seed(123)
+m_pls <- train(
+  x_train, y_train,
+  method = "pls",
+  tuneLength = 15,
+  trControl = ctrl
+)
+p_pls <- predict(m_pls, x_test)
+add_model("PLS-DA", m_pls, p_pls)
+
+
+# 4. Lasso (glmnet α=1)
+set.seed(123)
+m_lasso <- train(
+  x_train, y_train,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 1, lambda = seq(0.0001, 1, length = 20)),
+  trControl = ctrl
+)
+p_lasso <- predict(m_lasso, x_test)
+add_model("Lasso", m_lasso, p_lasso)
+
+
+# 5. Ridge (glmnet α=0)
+set.seed(123)
+m_ridge <- train(
+  x_train, y_train,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0, lambda = seq(0.0001, 1, length = 20)),
+  trControl = ctrl
+)
+p_ridge <- predict(m_ridge, x_test)
+add_model("Ridge", m_ridge, p_ridge)
+
+
+
+# 6. Elastic Net (α ∈ [0,1])
+set.seed(123)
+m_en <- train(
+  x_train, y_train,
+  method = "glmnet",
+  tuneGrid = expand.grid(
+    alpha = seq(0, 1, length = 5),
+    lambda = seq(0.0001, 1, length = 20)
+  ),
+  trControl = ctrl
+)
+p_en <- predict(m_en, x_test)
+add_model("Elastic Net", m_en, p_en)
+
+
+
+# NON-LINEAR MODELS 
+# 7. Nonlinear Discriminant Analysis (method = "mda")
+# Fixed: changed 'nda' to 'mda' (Mixture Discriminant Analysis)
+set.seed(123)
+m_nda <- train(
+  x_train, y_train,
+  method = "mda",
+  trControl = ctrl
+)
+p_nda <- predict(m_nda, x_test)
+add_model("NDA", m_nda, p_nda)
+
+
+
+# 8. Neural Network (nnet)
+set.seed(123)
+m_nnet <- train(
+  x_train, y_train,
+  method = "nnet",
+  trace = FALSE,
+  tuneLength = 3,
+  trControl = ctrl
+)
+p_nnet <- predict(m_nnet, x_test)
+add_model("Neural Network", m_nnet, p_nnet)
+
+
+# 9. Flexible Discriminant Analysis
+set.seed(123)
+m_fda <- train(
+  x_train, y_train,
+  method = "fda",
+  tuneLength = 10,
+  trControl = ctrl
+)
+p_fda <- predict(m_fda, x_test)
+add_model("FDA", m_fda, p_fda)
+
+
+# 10. Support Vector Machine (RBF)
+set.seed(123)
+m_svm <- train(
+  x_train, y_train,
+  method = "svmRadial",
+  tuneLength = 3,
+  trControl = ctrl
+)
+p_svm <- predict(m_svm, x_test)
+add_model("SVM (RBF)", m_svm, p_svm)
+
+
+# 11. KNN classifier
+set.seed(123)
+m_knn <- train(
+  x_train, y_train,
+  method = "knn",
+  tuneLength = 15,
+  trControl = ctrl
+)
+p_knn <- predict(m_knn, x_test)
+add_model("KNN", m_knn, p_knn)
+
+
+# 12. Naive Bayes
+set.seed(123)
+m_nb <- train(
+  x_train, y_train,
+  method = "naive_bayes",
+  trControl = ctrl
+)
+p_nb <- predict(m_nb, x_test)
+add_model("Naive Bayes", m_nb, p_nb)
+
+
+
+# Generating Table Results 
+results_all <- do.call(rbind, results_list)
+results_all <- results_all[order(-results_all$Kappa), ]
+
+print(results_all)
+
+write.csv(results_all, file.path(CFG$out_dir, "model_kappa_results_original.csv"), row.names = FALSE)
 
 # Save confusion matrices (Not Working will try fixing it tomorrow)
 saveRDS(conf_list, file.path(CFG$out_dir, "model_confusion_matrices.rds"))
