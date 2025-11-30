@@ -658,7 +658,7 @@ m_log <- train(
 p_log <- predict(m_log, x_test)
 add_model("Logistic Regression", m_log, p_log)
 
-print(m_log)
+
 
 # 2. Linear Discriminant Analysis
 set.seed(123)
@@ -739,16 +739,16 @@ add_model("NDA", m_nda, p_nda)
 
 
 # 8. Neural Network (nnet)
-#set.seed(123)
-#m_nnet <- train(
-#  x_train, y_train,
-#  method = "nnet",
-#  trace = FALSE,
-#  tuneLength = 3,
-#  trControl = ctrl
-#)
-#p_nnet <- predict(m_nnet, x_test)
-#add_model("Neural Network", m_nnet, p_nnet)
+set.seed(123)
+m_nnet <- train(
+  x_train, y_train,
+  method = "nnet",
+  trace = FALSE,
+  tuneLength = 3,
+  trControl = ctrl
+)
+p_nnet <- predict(m_nnet, x_test)
+add_model("Neural Network", m_nnet, p_nnet)
 
 
 # 9. Flexible Discriminant Analysis
@@ -764,15 +764,15 @@ add_model("FDA", m_fda, p_fda)
 
 
 # 10. Support Vector Machine (RBF)
-#set.seed(123)
-#m_svm <- train(
-#  x_train, y_train,
-#  method = "svmRadial",
-#  tuneLength = 3,
-#  trControl = ctrl
-#)
-#p_svm <- predict(m_svm, x_test)
-#add_model("SVM (RBF)", m_svm, p_svm)
+set.seed(123)
+m_svm <- train(
+  x_train, y_train,
+  method = "svmRadial",
+  tuneLength = 3,
+  trControl = ctrl
+)
+p_svm <- predict(m_svm, x_test)
+add_model("SVM (RBF)", m_svm, p_svm)
 
 
 # 11. KNN classifier
@@ -839,6 +839,205 @@ all_stats_df  <- do.call(rbind, stats_list)
 # Write to CSV
 write.csv(all_counts_df, file.path("Final_Project_Phase2_Results/model_confusion_matrix_counts_original.csv"), row.names = FALSE)
 write.csv(all_stats_df,  file.path("Final_Project_Phase2_Results/model_detailed_class_metrics_original.csv"),  row.names = FALSE)
+
+
+
+
+
+
+print(m_log)
+print(m_lda)
+print(m_pls)
+print(m_lasso)
+print(m_ridge)
+print(m_en)
+print(m_nda)
+print(m_nnet)
+print(m_fda)
+print(m_svm)
+print(m_knn)
+print(m_nb)
+
+plot(m_log)
+plot(m_lda)
+plot(m_pls)
+plot(m_lasso)
+plot(m_ridge)
+plot(m_en)
+plot(m_nda)
+plot(m_nnet)
+plot(m_fda)
+plot(m_svm)
+plot(m_knn)
+plot(m_nb)
+
+
+confusionMatrix(m_fda)
+
+confusionMatrix(m_nda)
+
+pred_fda <- predict(m_fda, newdata = x_test)
+confusionMatrix(pred_fda, y_test)
+
+pred_fda <- predict(m_nda, newdata = x_test)
+confusionMatrix(pred_fda, y_test)
+
+imp_fda <- varImp(m_fda)
+top10_fda <- head(imp_fda$importance[order(-imp_fda$importance$Overall), , drop = FALSE], 15)
+top10_fda
+
+
+
+imp_fda <- varImp(m_nda)
+top10_fda <- head(imp_fda$importance[order(-imp_fda$importance$Overall), , drop = FALSE], 15)
+top10_fda
+
+
+
+imp_nda <- varImp(m_nda)$importance
+
+# Average importance across classes (for multi-class)
+imp_nda$Mean <- rowMeans(imp_nda)
+
+# Sort by the Mean column
+top10_nda <- head(imp_nda[order(-imp_nda$Mean), , drop = FALSE], 10)
+
+top10_nda
+
+
+
+
+
+
+
+
+
+
+
+get_top10 <- function(model) {
+  imp <- varImp(model)$importance
+  
+  # If the model returned one column (e.g., "Overall")
+  if (ncol(imp) == 1) {
+    imp_sorted <- imp[order(-imp[,1]), , drop = FALSE]
+  } else {
+    # Multi-class: mean across columns
+    imp$Mean <- rowMeans(imp)
+    imp_sorted <- imp[order(-imp$Mean), , drop = FALSE]
+  }
+  
+  head(imp_sorted, 10)
+}
+
+
+
+get_top10(m_fda)
+get_top10(m_nda)
+
+
+
+
+
+
+
+library(ggplot2)
+library(caret) # Ensure caret is loaded for varImp
+
+# Function to get top n predictors and prepare for plotting
+get_top_n_data <- function(model, n = 5) {
+  imp <- varImp(model)$importance
+  
+  # Handle different importance structures
+  if (ncol(imp) == 1) {
+    # Rename column to "Importance" for consistency
+    names(imp) <- "Importance"
+    imp_sorted <- imp[order(-imp$Importance), , drop = FALSE]
+  } else {
+    # Multi-class: calculate mean across classes
+    imp$Importance <- rowMeans(imp)
+    imp_sorted <- imp[order(-imp$Importance), , drop = FALSE]
+  }
+  
+  # Slice top n
+  top_n <- head(imp_sorted, n)
+  
+  # Convert row names to a proper column for ggplot
+  top_n$Feature <- rownames(top_n)
+  
+  return(top_n)
+}
+
+# Function to plot the data
+plot_top_predictors <- function(model, model_name) {
+  # Get data
+  plot_data <- get_top_n_data(model, n = 5)
+  
+  # Plot
+  ggplot(plot_data, aes(x = reorder(Feature, Importance), y = Importance)) +
+    geom_bar(stat = "identity", fill = "steelblue") +
+    coord_flip() +  # Flip coordinates for readable labels
+    theme_minimal() +
+    labs(title = paste("Top 5 Predictors:", model_name),
+         x = "Predictor",
+         y = "Importance") +
+    theme(axis.text.y = element_text(size = 11))
+}
+
+# --- Usage ---
+
+# 1. Plot for FDA model
+plot_top_predictors(m_fda, "FDA Model")
+
+# 2. Plot for NDA model
+plot_top_predictors(m_nda, "NDA Model")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
