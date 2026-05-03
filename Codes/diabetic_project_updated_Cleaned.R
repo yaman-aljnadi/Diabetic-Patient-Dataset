@@ -565,8 +565,17 @@ cat("Files written to:", normalizePath(CFG$out_dir), "\n")
 
 
 
+<<<<<<< Updated upstream
 #  MODEL TRAINING FOR 12 CLASSIFIERS ORIGINAL SAMPLE SIZE
 #  Uses caret::train(), Kappa, Confusion Matrix, and Test Set
+=======
+# ================================================================
+#  MODEL TRAINING FOR 12 CLASSIFIERS
+#  Uses caret::train(), Kappa, Confusion Matrix, and Test Set
+# ================================================================
+
+# Note: library calls consolidated at the top
+>>>>>>> Stashed changes
 
 set.seed(123)
 
@@ -612,10 +621,21 @@ x_test  <- dplyr::select(test_set,  -!!sym(response))
 y_train <- train_set[[response]]
 y_test  <- test_set[[response]]
 
+<<<<<<< Updated upstream
 # Common Training Control (K-fold CV)
 library(doParallel)
 
 # 1. Register Parallel Backend. This is makes it run the NN model faster
+=======
+#============================================================
+# Common Training Control (K-fold CV)
+#============================================================
+
+library(doParallel)
+
+# 1. Register Parallel Backend
+# detectCores() finds how many you have. We use -1 to leave one free for your OS.
+>>>>>>> Stashed changes
 num_cores <- parallel::detectCores() - 1 
 cl <- makePSOCKcluster(num_cores)
 registerDoParallel(cl)
@@ -623,6 +643,7 @@ registerDoParallel(cl)
 # 2. Update Control for Monitoring
 ctrl <- trainControl(
   method = "cv",
+<<<<<<< Updated upstream
   number = 10,                 
   summaryFunction = multiClassSummary,
   classProbs = TRUE,
@@ -631,6 +652,19 @@ ctrl <- trainControl(
 )
 
 # Storage structure
+=======
+  number = 10,                 # 10-fold CV [cite: 12]
+  summaryFunction = multiClassSummary,
+  classProbs = TRUE,
+  allowParallel = TRUE,        # Tells caret to use the registered cores
+  verboseIter = TRUE           # <--- This prints progress to the console!
+)
+
+#============================================================
+# Storage structure
+#============================================================
+
+>>>>>>> Stashed changes
 model_list <- list()
 results_list <- list()
 conf_list <- list()
@@ -645,10 +679,21 @@ add_model <- function(name, model, prediction) {
   )
 }
 
+<<<<<<< Updated upstream
 # LINEAR MODELS
 
 
 # 1. Logistic Regression ("multinom" for multi-class)
+=======
+#============================================================
+# >>>>>>>>>>>>>> 6 LINEAR MODELS <<<<<<<<<<<<<<<<<<
+#============================================================
+
+
+#------------------------------------------------------------
+# 1. Logistic Regression ("multinom" for multi-class)
+#------------------------------------------------------------
+>>>>>>> Stashed changes
 set.seed(123)
 m_log <- train(
   x_train, y_train,
@@ -658,9 +703,17 @@ m_log <- train(
 p_log <- predict(m_log, x_test)
 add_model("Logistic Regression", m_log, p_log)
 
+<<<<<<< Updated upstream
 
 
 # 2. Linear Discriminant Analysis
+=======
+print(m_log)
+
+#------------------------------------------------------------
+# 2. Linear Discriminant Analysis
+#------------------------------------------------------------
+>>>>>>> Stashed changes
 set.seed(123)
 m_lda <- train(
   x_train, y_train,
@@ -671,7 +724,13 @@ p_lda <- predict(m_lda, x_test)
 add_model("LDA", m_lda, p_lda)
 
 
+<<<<<<< Updated upstream
 # 3. PLS-DA  ("pls" chooses PLSDA when outcome is factor)
+=======
+#------------------------------------------------------------
+# 3. PLS-DA  ("pls" chooses PLSDA when outcome is factor)
+#------------------------------------------------------------
+>>>>>>> Stashed changes
 set.seed(123)
 m_pls <- train(
   x_train, y_train,
@@ -683,7 +742,13 @@ p_pls <- predict(m_pls, x_test)
 add_model("PLS-DA", m_pls, p_pls)
 
 
+<<<<<<< Updated upstream
 # 4. Lasso (glmnet α=1)
+=======
+#------------------------------------------------------------
+# 4. Lasso (glmnet α=1)
+#------------------------------------------------------------
+>>>>>>> Stashed changes
 set.seed(123)
 m_lasso <- train(
   x_train, y_train,
@@ -695,7 +760,13 @@ p_lasso <- predict(m_lasso, x_test)
 add_model("Lasso", m_lasso, p_lasso)
 
 
+<<<<<<< Updated upstream
 # 5. Ridge (glmnet α=0)
+=======
+#------------------------------------------------------------
+# 5. Ridge (glmnet α=0)
+#------------------------------------------------------------
+>>>>>>> Stashed changes
 set.seed(123)
 m_ridge <- train(
   x_train, y_train,
@@ -707,8 +778,14 @@ p_ridge <- predict(m_ridge, x_test)
 add_model("Ridge", m_ridge, p_ridge)
 
 
+<<<<<<< Updated upstream
 
 # 6. Elastic Net (α ∈ [0,1])
+=======
+#------------------------------------------------------------
+# 6. Elastic Net (α ∈ [0,1])
+#------------------------------------------------------------
+>>>>>>> Stashed changes
 set.seed(123)
 m_en <- train(
   x_train, y_train,
@@ -723,10 +800,22 @@ p_en <- predict(m_en, x_test)
 add_model("Elastic Net", m_en, p_en)
 
 
+<<<<<<< Updated upstream
 
 # NON-LINEAR MODELS 
 # 7. Nonlinear Discriminant Analysis (method = "mda")
 # Fixed: changed 'nda' to 'mda' (Mixture Discriminant Analysis)
+=======
+#============================================================
+# >>>>>>>>>>>>>> 6 NON-LINEAR MODELS <<<<<<<<<<<<<<<<<<
+#============================================================
+
+
+#------------------------------------------------------------
+# 7. Nonlinear Discriminant Analysis (method = "mda")
+# Fixed: changed 'nda' to 'mda' (Mixture Discriminant Analysis)
+#------------------------------------------------------------
+>>>>>>> Stashed changes
 set.seed(123)
 m_nda <- train(
   x_train, y_train,
@@ -737,8 +826,14 @@ p_nda <- predict(m_nda, x_test)
 add_model("NDA", m_nda, p_nda)
 
 
+<<<<<<< Updated upstream
 
 # 8. Neural Network (nnet)
+=======
+#------------------------------------------------------------
+# 8. Neural Network (nnet)
+#------------------------------------------------------------
+>>>>>>> Stashed changes
 set.seed(123)
 m_nnet <- train(
   x_train, y_train,
@@ -751,7 +846,13 @@ p_nnet <- predict(m_nnet, x_test)
 add_model("Neural Network", m_nnet, p_nnet)
 
 
+<<<<<<< Updated upstream
 # 9. Flexible Discriminant Analysis
+=======
+#------------------------------------------------------------
+# 9. Flexible Discriminant Analysis
+#------------------------------------------------------------
+>>>>>>> Stashed changes
 set.seed(123)
 m_fda <- train(
   x_train, y_train,
@@ -763,7 +864,13 @@ p_fda <- predict(m_fda, x_test)
 add_model("FDA", m_fda, p_fda)
 
 
+<<<<<<< Updated upstream
 # 10. Support Vector Machine (RBF)
+=======
+#------------------------------------------------------------
+# 10. Support Vector Machine (RBF)
+#------------------------------------------------------------
+>>>>>>> Stashed changes
 set.seed(123)
 m_svm <- train(
   x_train, y_train,
@@ -775,7 +882,13 @@ p_svm <- predict(m_svm, x_test)
 add_model("SVM (RBF)", m_svm, p_svm)
 
 
+<<<<<<< Updated upstream
 # 11. KNN classifier
+=======
+#------------------------------------------------------------
+# 11. KNN classifier
+#------------------------------------------------------------
+>>>>>>> Stashed changes
 set.seed(123)
 m_knn <- train(
   x_train, y_train,
@@ -787,7 +900,13 @@ p_knn <- predict(m_knn, x_test)
 add_model("KNN", m_knn, p_knn)
 
 
+<<<<<<< Updated upstream
 # 12. Naive Bayes
+=======
+#------------------------------------------------------------
+# 12. Naive Bayes
+#------------------------------------------------------------
+>>>>>>> Stashed changes
 set.seed(123)
 m_nb <- train(
   x_train, y_train,
@@ -798,13 +917,21 @@ p_nb <- predict(m_nb, x_test)
 add_model("Naive Bayes", m_nb, p_nb)
 
 
+<<<<<<< Updated upstream
 
 # Generating Table Results 
+=======
+#============================================================
+# === Final Comparison Table ===
+#============================================================
+
+>>>>>>> Stashed changes
 results_all <- do.call(rbind, results_list)
 results_all <- results_all[order(-results_all$Kappa), ]
 
 print(results_all)
 
+<<<<<<< Updated upstream
 write.csv(results_all, file.path("Final_Project_Phase2_Results/model_kappa_results_original.csv"), row.names = FALSE)
 
 
@@ -1622,3 +1749,11 @@ write.csv(all_stats_df,  file.path("Final_Project_Phase2_Results/model_detailed_
 
 
 
+=======
+write.csv(results_all, file.path(CFG$out_dir, "model_kappa_results.csv"), row.names = FALSE)
+
+# Save confusion matrices
+saveRDS(conf_list, file.path(CFG$out_dir, "model_confusion_matrices.rds"))
+
+cat("Training completed. Summary written to outputs/.")
+>>>>>>> Stashed changes
